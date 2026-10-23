@@ -7,7 +7,9 @@ on:
     branches: [main]
     types:
       - completed
-      
+  # Allows the build check to be run manually
+  workflow_dispatch:
+
 permissions:
   contents: read
 
@@ -32,3 +34,57 @@ jobs:
         run: bundle exec jekyll build --strict_front_matter
         env:
           JEKYLL_ENV: production
+
+      - name: Verify homepage content
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+
+          home = Path("_site/index.html").read_text()
+          required = [
+              "Junteng Liu",
+              "First-year PhD candidate at HKUST NLP Group",
+              "Hong Kong University of Science and Technology",
+              "Shanghai Jiao Tong University",
+              "Professor Junxian He",
+              "Zhiyuan Honor Scholarship",
+              "MINIMAX",
+              "Tencent WXG",
+              "Shanghai AI Lab",
+              "Zifei Shan",
+              "Prof. Yu Cheng",
+              "LLM Reasoning and Reinforcement Learning",
+              "Hallucination in Vision-Language Models (VLM)",
+              "LLM Truthfulness and Interpretability",
+              "jliugi@connect.ust.hk",
+              "https://github.com/Vicent0205",
+              "junteng88716710",
+              "SynLogic: Synthesizing Verifiable Reasoning Data at Scale for Learning Logical Reasoning and Beyond",
+              "On the Perception Bottleneck of VLMs for Chart Understanding",
+              "On the Universal Truthfulness Hyperplane Inside LLMs",
+              "In-Context Sharpness as Alerts",
+              "C-Eval: A Multi-Level Multi-Discipline Chinese Evaluation Suite for Foundation Models",
+              "Composing Parameter-Efficient Modules with Arithmetic Operations",
+          ]
+          missing = [text for text in required if text not in home]
+          if missing:
+              sys.exit("Missing from homepage: " + repr(missing))
+
+          for slug in [
+              "synlogic",
+              "perception-bottleneck",
+              "universal-truthfulness-hyperplane",
+              "in-context-sharpness",
+              "ceval",
+              "composing-parameter-efficient-modules",
+          ]:
+              if not Path(f"_site/publication/{slug}/index.html").is_file():
+                  sys.exit("Missing publication page: " + slug)
+
+          for page in ["publications/index.html", "cv/index.html"]:
+              if not Path("_site", page).is_file():
+                  sys.exit("Missing page: " + page)
+
+          print("Homepage, publication and CV content checks passed.")
+          PY
