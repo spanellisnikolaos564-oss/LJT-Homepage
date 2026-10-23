@@ -1,0 +1,45 @@
+name: Probe Pages publishing
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe legacy Pages branch publishing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          API="https://api.github.com/repos/$GITHUB_REPOSITORY"
+          auth=(-H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json")
+          SHA=$(curl -s "${auth[@]}" "$API/git/ref/heads/master" | python3 -c 'import sys,json; print(json.load(sys.stdin)["object"]["sha"])')
+          echo "Master commit: $SHA"
+          EXISTING=$(curl -s -o /dev/null -w '%{http_code}' "${auth[@]}" "$API/git/ref/heads/gh-pages")
+          CREATED=0
+          if [ "$EXISTING" = "404" ]; then
+            curl -s "${auth[@]}" -X POST -d "{\"ref\":\"refs/heads/gh-pages\",\"sha\":\"$SHA\"}" "$API/git/refs"
+            CREATED=1
+            echo "Created gh-pages probe branch."
+          fi
+          sleep 45
+          HTTP=$(curl -s -o /dev/null -w '%{http_code}' -L https://spanellisnikolaos564-oss.github.io/LJT-Homepage/)
+          echo "Site HTTP status: $HTTP"
+          if [ "$HTTP" != "200" ]; then
+            sleep 45
+            HTTP=$(curl -s -o /dev/null -w '%{http_code}' -L https://spanellisnikolaos564-oss.github.io/LJT-Homepage/)
+            echo "Site HTTP status after retry: $HTTP"
+          fi
+          if [ "$HTTP" != "200" ]; then
+            if [ "$CREATED" = "1" ]; then
+              curl -s "${auth[@]}" -X DELETE "$API/git/refs/heads/gh-pages"
+              echo "Removed gh-pages probe branch."
+            fi
+            echo "RESULT: legacy Pages publishing is not active."
+          else
+            echo "RESULT: Pages is serving the site from gh-pages."
+          fi
